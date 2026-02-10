@@ -1,0 +1,12 @@
+imagen,clase_predicha,confianza
+Bateria.jpg,batería,96.77%
+BotellaPlastico.jpg,plástico,80.43%
+carton.jpg,cartón,99.96%
+MANZNA-ROJA.jpg,residuo orgánico,93.98%
+metal.jpeg,metal,57.31%
+papel.jpg,papel,81.97%
+pañal.jpeg,basura,71.70%
+ropa.jpeg,ropa,94.43%
+vidrioblanco.jpeg,vidrio blanco,81.62%
+Vidriopg.jpg,vidrio verde,91.83%
+zapatos.jpg,calzado,60.42%

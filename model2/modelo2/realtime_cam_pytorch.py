@@ -19,7 +19,7 @@ dispositivo = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Usando dispositivo:", dispositivo)
 
 # =========================
-# CARGAR NOMBRES DE CLASES
+# CARGAR NOMBRES DE CLASES (INGLÉS)
 # =========================
 with open(ARCHIVO_CLASES, "r", encoding="utf-8") as f:
     nombres_clases = [linea.strip() for linea in f if linea.strip()]
@@ -28,7 +28,25 @@ num_clases = len(nombres_clases)
 print("Clases detectadas:", nombres_clases)
 
 # =========================
-# MODELO (MISMA ARQUITECTURA QUE ENTRENAMIENTO)
+# TRADUCCIÓN DE CLASES (EN → ES)
+# =========================
+TRADUCCION_CLASES = {
+    "battery": "batería",
+    "biological": "residuo orgánico",
+    "brown-glass": "vidrio marrón",
+    "cardboard": "cartón",
+    "clothes": "ropa",
+    "green-glass": "vidrio verde",
+    "metal": "metal",
+    "paper": "papel",
+    "plastic": "plástico",
+    "shoes": "calzado",
+    "trash": "basura",
+    "white-glass": "vidrio blanco"
+}
+
+# =========================
+# MODELO (MISMA ARQUITECTURA)
 # =========================
 def crear_modelo(num_clases):
     modelo = models.mobilenet_v2(pretrained=False)
@@ -67,7 +85,7 @@ def preprocesar_frame(frame_bgr):
 # =========================
 # CÁMARA
 # =========================
-camara = cv2.VideoCapture(0)  # cambia a 1 si tienes otra cámara
+camara = cv2.VideoCapture(0)  # cambia a 1 si usas otra cámara
 
 if not camara.isOpened():
     raise RuntimeError("No se pudo abrir la cámara")
@@ -96,7 +114,8 @@ while True:
             probabilidades = torch.softmax(salidas[0], dim=0)
             confianza, indice = torch.max(probabilidades, 0)
 
-            texto_clase = nombres_clases[indice.item()]
+            clase_ingles = nombres_clases[indice.item()]
+            texto_clase = TRADUCCION_CLASES.get(clase_ingles, clase_ingles)
             texto_confianza = f"{confianza.item() * 100:.1f}%"
 
     # =========================
