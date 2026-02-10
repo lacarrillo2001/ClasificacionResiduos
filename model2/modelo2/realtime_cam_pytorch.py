@@ -9,23 +9,24 @@ from PIL import Image
 # =========================
 RUTA_MODELO = "garbage_mobilenetv2_best.pth"
 ARCHIVO_CLASES = "class_names.txt"
+
 TAM_IMAGEN = (224, 224)
-PREDECIR_CADA_N = 5  # predice cada N frames
+PREDECIR_CADA_N = 5  # para fluidez
 
 # =========================
 # DISPOSITIVO
 # =========================
 dispositivo = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("Usando dispositivo:", dispositivo)
+print("🖥️ Usando dispositivo:", dispositivo)
 
 # =========================
-# CARGAR NOMBRES DE CLASES (INGLÉS)
+# CLASES DEL MODELO (INGLÉS)
 # =========================
 with open(ARCHIVO_CLASES, "r", encoding="utf-8") as f:
-    nombres_clases = [linea.strip() for linea in f if linea.strip()]
+    nombres_clases = [line.strip() for line in f if line.strip()]
 
 num_clases = len(nombres_clases)
-print("Clases detectadas:", nombres_clases)
+print("Clases del modelo:", nombres_clases)
 
 # =========================
 # TRADUCCIÓN DE CLASES (EN → ES)
@@ -33,20 +34,36 @@ print("Clases detectadas:", nombres_clases)
 TRADUCCION_CLASES = {
     "battery": "batería",
     "biological": "residuo orgánico",
-    "brown-glass": "vidrio marrón",
+    "brown-glass": "vidrio",
     "cardboard": "cartón",
     "clothes": "ropa",
-    "green-glass": "vidrio verde",
+    "green-glass": "vidrio",
     "metal": "metal",
     "paper": "papel",
     "plastic": "plástico",
     "shoes": "calzado",
     "trash": "basura",
-    "white-glass": "vidrio blanco"
+    "white-glass": "vidrio"
 }
 
 # =========================
-# MODELO (MISMA ARQUITECTURA)
+# SOLO 4 CATEGORÍAS DE RECICLAJE
+# =========================
+CATEGORIA_RECICLAJE = {
+    # 🟢 Orgánico
+    "biological": "Orgánico",
+
+    # 🔵 Papel / Cartón
+    "paper": "Papel / Cartón",
+    "cardboard": "Papel / Cartón",
+
+    # 🟡 Plástico
+    "plastic": "Plástico"
+}
+# Todo lo demás → No reciclable
+
+# =========================
+# MODELO
 # =========================
 def crear_modelo(num_clases):
     modelo = models.mobilenet_v2(pretrained=False)
@@ -61,7 +78,7 @@ modelo.load_state_dict(torch.load(RUTA_MODELO, map_location=dispositivo))
 modelo = modelo.to(dispositivo)
 modelo.eval()
 
-print("Modelo cargado correctamente")
+print("✅ Modelo cargado correctamente")
 
 # =========================
 # TRANSFORMACIONES
@@ -76,7 +93,6 @@ transformaciones = transforms.Compose([
 ])
 
 def preprocesar_frame(frame_bgr):
-    """Convierte un frame de OpenCV a tensor para PyTorch"""
     frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     imagen_pil = Image.fromarray(frame_rgb)
     tensor = transformaciones(imagen_pil).unsqueeze(0)
@@ -85,15 +101,15 @@ def preprocesar_frame(frame_bgr):
 # =========================
 # CÁMARA
 # =========================
-camara = cv2.VideoCapture(0)  # cambia a 1 si usas otra cámara
+camara = cv2.VideoCapture(0)
 
 if not camara.isOpened():
-    raise RuntimeError("No se pudo abrir la cámara")
+    raise RuntimeError("❌ No se pudo abrir la cámara")
 
-print("🎥 Cámara iniciada. Presiona 'q' para salir.")
+print("🎥 Cámara activa. Presiona 'q' para salir.")
 
-contador_frames = 0
-texto_clase = "..."
+contador = 0
+texto_categoria = "..."
 texto_confianza = ""
 
 # =========================
@@ -104,33 +120,34 @@ while True:
     if not ret:
         break
 
-    contador_frames += 1
+    contador += 1
 
-    if contador_frames % PREDECIR_CADA_N == 0:
+    if contador % PREDECIR_CADA_N == 0:
         x = preprocesar_frame(frame)
 
         with torch.no_grad():
             salidas = modelo(x)
-            probabilidades = torch.softmax(salidas[0], dim=0)
-            confianza, indice = torch.max(probabilidades, 0)
+            probs = torch.softmax(salidas[0], dim=0)
+            confianza, indice = torch.max(probs, 0)
 
-            clase_ingles = nombres_clases[indice.item()]
-            texto_clase = TRADUCCION_CLASES.get(clase_ingles, clase_ingles)
-            texto_confianza = f"{confianza.item() * 100:.1f}%"
+        clase_ingles = nombres_clases[indice.item()]
+        categoria = CATEGORIA_RECICLAJE.get(clase_ingles, "No reciclable")
+        texto_categoria = categoria
+        texto_confianza = f"{confianza.item() * 100:.1f}%"
 
     # =========================
     # TEXTO EN PANTALLA
     # =========================
-    cv2.putText(frame, f"Clase: {texto_clase}", (15, 40),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    cv2.putText(frame, f"Categoria: {texto_categoria}", (15, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     cv2.putText(frame, f"Confianza: {texto_confianza}", (15, 80),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
     cv2.putText(frame, f"Dispositivo: {dispositivo}", (15, frame.shape[0] - 20),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-    cv2.imshow("Clasificación de Residuos - PyTorch (Tiempo Real)", frame)
+    cv2.imshow("Clasificacion de Residuos (4 Categorias)", frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
@@ -140,4 +157,4 @@ while True:
 # =========================
 camara.release()
 cv2.destroyAllWindows()
-print("✔️ Inferencia finalizada")
+print("✔️ Detección en vivo finalizada")

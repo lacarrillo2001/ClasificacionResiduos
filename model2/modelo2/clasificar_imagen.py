@@ -11,35 +11,29 @@ import csv
 RUTA_MODELO = "garbage_mobilenetv2_best.pth"
 ARCHIVO_CLASES = "class_names.txt"
 
-# 👉 carpeta con imágenes de prueba
-# RUTA SEGURA (funciona siempre)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CARPETA_IMAGENES = os.path.join(BASE_DIR, "..", "imagenes_prueba")
-
 
 TAM_IMAGEN = (224, 224)
 EXTENSIONES_VALIDAS = (".jpg", ".jpeg", ".png")
 
-# Opcional: guardar resultados
 GUARDAR_CSV = True
-ARCHIVO_SALIDA = "resultados_clasificacion.csv"
+ARCHIVO_SALIDA = "resultados_reciclaje_4_categorias.csv"
 
 # =========================
 # DISPOSITIVO
 # =========================
 dispositivo = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("Usando dispositivo:", dispositivo)
+print("🖥️ Usando dispositivo:", dispositivo)
 
 # =========================
-# CARGAR NOMBRES DE CLASES
+# CLASES DEL MODELO (INGLÉS)
 # =========================
 with open(ARCHIVO_CLASES, "r", encoding="utf-8") as f:
     nombres_clases = [line.strip() for line in f if line.strip()]
 
 num_clases = len(nombres_clases)
-print("Clases:", nombres_clases)
-
-
+print("Clases del modelo:", nombres_clases)
 
 # =========================
 # TRADUCCIÓN DE CLASES (EN → ES)
@@ -60,7 +54,24 @@ TRADUCCION_CLASES = {
 }
 
 # =========================
-# MODELO (MISMA ARQUITECTURA)
+# SOLO 4 CATEGORÍAS DE RECICLAJE
+# =========================
+CATEGORIA_RECICLAJE = {
+    # 🟢 Orgánico
+    "biological": "🟢 Orgánico",
+
+    # 🔵 Papel / Cartón
+    "paper": "🔵 Papel / Cartón",
+    "cardboard": "🔵 Papel / Cartón",
+
+    # 🟡 Plástico
+    "plastic": "🟡 Plástico"
+}
+
+# Todo lo que NO esté arriba → No reciclable
+
+# =========================
+# MODELO
 # =========================
 def crear_modelo(num_clases):
     modelo = models.mobilenet_v2(pretrained=False)
@@ -75,7 +86,7 @@ modelo.load_state_dict(torch.load(RUTA_MODELO, map_location=dispositivo))
 modelo = modelo.to(dispositivo)
 modelo.eval()
 
-print("Modelo cargado correctamente")
+print("✅ Modelo cargado correctamente")
 
 # =========================
 # TRANSFORMACIONES
@@ -90,11 +101,11 @@ transformaciones = transforms.Compose([
 ])
 
 # =========================
-# CLASIFICAR IMÁGENES
+# CLASIFICACIÓN
 # =========================
 resultados = []
 
-print("\n🧠 Clasificando imágenes...\n")
+print("\n♻️ Clasificando imágenes (4 categorías)...\n")
 
 for nombre_archivo in os.listdir(CARPETA_IMAGENES):
     if not nombre_archivo.lower().endswith(EXTENSIONES_VALIDAS):
@@ -116,30 +127,36 @@ for nombre_archivo in os.listdir(CARPETA_IMAGENES):
         confianza, indice = torch.max(probabilidades, 0)
 
     clase_ingles = nombres_clases[indice.item()]
-    clase_espanol = TRADUCCION_CLASES.get(clase_ingles, clase_ingles)
-
+    tipo_espanol = TRADUCCION_CLASES.get(clase_ingles, clase_ingles)
+    categoria = CATEGORIA_RECICLAJE.get(clase_ingles, "⚫ No reciclable")
     confianza_pct = confianza.item() * 100
-
 
     resultados.append([
         nombre_archivo,
-        clase_espanol,
+        tipo_espanol,
+        categoria,
         f"{confianza_pct:.2f}%"
     ])
 
     print(f"📷 {nombre_archivo}")
-    print(f"   → Clase: {clase_espanol}")
+    print(f"   → Tipo detectado: {tipo_espanol}")
+    print(f"   → Categoría de reciclaje: {categoria}")
     print(f"   → Confianza: {confianza_pct:.2f}%\n")
 
 # =========================
-# GUARDAR CSV (OPCIONAL)
+# GUARDAR CSV
 # =========================
 if GUARDAR_CSV and resultados:
     with open(ARCHIVO_SALIDA, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["imagen", "clase_predicha", "confianza"])
+        writer.writerow([
+            "imagen",
+            "tipo_detectado",
+            "categoria_reciclaje",
+            "confianza"
+        ])
         writer.writerows(resultados)
 
-    print(f"✅ Resultados guardados en: {ARCHIVO_SALIDA}")
+    print(f"📄 Resultados guardados en: {ARCHIVO_SALIDA}")
 
-print("\n✔️ Clasificación finalizada")
+print("\n✔️ Clasificación finalizada (4 categorías)")
